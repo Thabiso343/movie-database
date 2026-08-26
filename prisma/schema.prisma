@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Auth.js required models ---
+// This exact shape (User/Account/Session/VerificationToken) is what
+// @auth/prisma-adapter expects. We're using database sessions (not JWT),
+// so a session row genuinely lives in Postgres and can be revoked by
+// deleting it — that's why Session exists as a real table here.
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+
+  accounts      Account[]
+  sessions      Session[]
+  watchlist     Watchlist[]
+  ratings       Rating[]
+  reviews       Review[]
+  searchHistory SearchHistory[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// --- Application models ---
+// Deliberately no Movie table. Per the project brief: TMDB stays the
+// single source of truth for movie metadata: title, poster, overview,
+// etc. Each row below stores only the TMDB movie id (a plain Int) plus
+// whatever is genuinely ours — who, when, what rating/review text.
+// Fetching a movie's title for a watchlist row means calling
+// getMovieDetails(movieId) at render time, the same TMDB service layer
+// already built — never a second, potentially-stale copy of TMDB's data.
+
+model Watchlist {
+  id        String   @id @default(cuid())
+  userId    String
+  movieId   Int
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // A movie can only appear once per user's watchlist — enforced by the
+  // database itself, not just application logic that could be bypassed.
+  @@unique([userId, movieId])
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  userId    String
+  movieId   Int
+  value     Int // 1–10
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // One rating per user per movie — re-rating updates the existing row.
+  @@unique([userId, movieId])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  movieId   Int
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // One review per user per movie — editing replaces it, doesn't add a
+  // second one. Matches the brief: users edit their own review, they
+  // don't accumulate duplicates.
+  @@unique([userId, movieId])
+}
+
+model SearchHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  query     String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

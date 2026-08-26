@@ -1,0 +1,24 @@
+import { PrismaClient } from "@prisma/client";
+
+/**
+ * Next.js dev mode hot-reloads modules on every file save, which would
+ * normally create a brand new PrismaClient (and a brand new pool of
+ * database connections) on every single edit. Postgres — and Neon in
+ * particular, which caps concurrent connections on its free tier — runs
+ * out of connections fast if that happens.
+ *
+ * The fix: stash the client on the Node.js global object, which survives
+ * hot reloads (it does NOT survive a full process restart, which is fine
+ * — that's a fresh start anyway). In production there's only ever one
+ * instance of the app process, so this codepath is effectively a no-op
+ * there; `globalForPrisma` just stays undefined and we create one client.
+ */
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+export const prisma = globalForPrisma.prisma ?? new PrismaClient();
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+}
