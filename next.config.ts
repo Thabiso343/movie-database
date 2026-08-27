@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "image.tmdb.org",
       },
+      {
+        protocol: "https",
+        hostname: "avatars.githubusercontent.com",
+      },
     ],
     // Next.js 16 only allows quality values listed here (default: [75]).
     // 90 gets us noticeably sharper posters without the size cost of 100.

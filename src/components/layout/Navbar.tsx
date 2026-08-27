@@ -4,7 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
+import type { Session } from "next-auth";
 import NavSearchForm from "@/components/navigation/NavSearchForm";
+import AuthButton from "@/components/auth/AuthButton";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
@@ -14,9 +16,20 @@ const NAV_LINKS = [
   { href: "/genres", label: "Genres" },
 ];
 
-export default function Navbar() {
+interface NavbarProps {
+  session: Session | null;
+}
+
+export default function Navbar({ session }: NavbarProps) {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  // Signed-out visitors never see a link to a page proxy.ts would just
+  // bounce them out of anyway -- building the list conditionally here is
+  // simpler than a bunch of scattered {session && ...} checks below.
+  const navLinks = session
+    ? [...NAV_LINKS, { href: "/watchlist", label: "Watchlist" }]
+    : NAV_LINKS;
 
   return (
     <header className="sticky top-0 z-50 border-b border-neutral-800 bg-neutral-950/90 backdrop-blur">
@@ -27,7 +40,7 @@ export default function Navbar() {
 
         {/* Desktop links */}
         <ul className="hidden items-center gap-1 md:flex">
-          {NAV_LINKS.map((link) => {
+          {navLinks.map((link) => {
             const isActive = pathname === link.href;
             return (
               <li key={link.href}>
@@ -47,8 +60,9 @@ export default function Navbar() {
           })}
         </ul>
 
-        <div className="hidden md:block">
+        <div className="hidden items-center gap-4 md:flex">
           <NavSearchForm />
+          <AuthButton session={session} />
         </div>
 
         {/* Mobile menu toggle */}
@@ -67,8 +81,11 @@ export default function Navbar() {
       {isMenuOpen && (
         <div className="space-y-3 border-t border-neutral-800 px-4 py-3 md:hidden">
           <NavSearchForm fullWidth onSubmitQuery={() => setIsMenuOpen(false)} />
+          <div className="border-b border-neutral-800 pb-3">
+            <AuthButton session={session} />
+          </div>
           <ul className="space-y-1">
-          {NAV_LINKS.map((link) => {
+          {navLinks.map((link) => {
             const isActive = pathname === link.href;
             return (
               <li key={link.href}>
