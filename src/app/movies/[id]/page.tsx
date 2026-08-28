@@ -6,8 +6,11 @@ import CastList from "@/components/movies/CastList";
 import MovieRow from "@/components/movies/MovieRow";
 import TrailerButton from "@/components/movies/TrailerButton";
 import WatchlistButton from "@/components/movies/WatchlistButton";
+import RatingWidget from "@/components/movies/RatingWidget";
+import ReviewsSection from "@/components/movies/ReviewsSection";
 import { auth } from "@/lib/auth/auth";
 import { getWatchlistStatus } from "@/lib/actions/watchlist";
+import { getUserRating } from "@/lib/actions/ratings";
 import { TmdbError } from "@/lib/tmdb/client";
 import {
   getMovieCredits,
@@ -59,20 +62,23 @@ export default async function MovieDetailsPage({
   let similarMovies;
   let session;
   let isInWatchlist;
+  let userRating;
   try {
     // All these depend on the same movieId (or nothing at all) and none
     // depends on another's result, so we fetch them concurrently instead
-    // of one after another. Session + watchlist status ride along here
-    // too, rather than each being its own separate await later down the
-    // page -- that would serialize things for no reason.
-    [movie, credits, trailer, similarMovies, session] = await Promise.all([
-      getMovieDetails(movieId),
-      getMovieCredits(movieId),
-      getMovieTrailer(movieId),
-      getSimilarMovies(movieId),
-      auth(),
-    ]);
-    isInWatchlist = await getWatchlistStatus(movieId);
+    // of one after another. Session, watchlist status, and rating ride
+    // along here too, rather than each being its own separate await
+    // later down the page -- that would serialize things for no reason.
+    [movie, credits, trailer, similarMovies, session, isInWatchlist, userRating] =
+      await Promise.all([
+        getMovieDetails(movieId),
+        getMovieCredits(movieId),
+        getMovieTrailer(movieId),
+        getSimilarMovies(movieId),
+        auth(),
+        getWatchlistStatus(movieId),
+        getUserRating(movieId),
+      ]);
   } catch (error) {
     // TMDB returning 404 means "this id doesn't exist" — that's Next.js's
     // built-in not-found case, not a broken app. Anything else (network
@@ -173,6 +179,14 @@ export default async function MovieDetailsPage({
               />
             </div>
 
+            <div className="mt-4">
+              <RatingWidget
+                movieId={movie.id}
+                initialRating={userRating}
+                isSignedIn={!!session}
+              />
+            </div>
+
             <p className="mt-6 max-w-2xl leading-relaxed text-neutral-300">
               {movie.overview || "No overview available."}
             </p>
@@ -181,6 +195,7 @@ export default async function MovieDetailsPage({
 
         <CastList cast={credits.cast} />
         <MovieRow title="Similar Movies" movies={similarMovies} />
+        <ReviewsSection movieId={movie.id} />
       </div>
     </div>
   );
